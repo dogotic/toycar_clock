@@ -45,10 +45,12 @@ ApplicationWindow {
 
             Button {
                 text: "Connect"
-                Layout.fillWidth: true
                 onClicked: {
-                    connectionStatusLabel.text = "Connecting..."
-                    bleManager.startScan()
+                    if (!bleManager.deviceFoundYet) {
+                        bleManager.startScan()
+                    } else {
+                        bleManager.connectToDevice()
+                    }
                 }
             }
 

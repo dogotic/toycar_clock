@@ -18,19 +18,21 @@ class BleManager : public QObject
     Q_OBJECT
 public:
     explicit BleManager(QObject *parent = nullptr);
-
+    ~BleManager();
+    void connectToDevice();
     Q_INVOKABLE void startScan();
     Q_INVOKABLE void sendConfig(const QVariantMap &cfg);
 
 signals:
     void log(const QString &msg);
+    void deviceFound();
     void connected();
     void disconnected();
-    void dataSent(QString type); // optional, for sendStatusLabel
+    void dataSent();   // optional, for JSON write feedback
 
 private:
     void writeToBle(const QByteArray &json);
-
+    QBluetoothDeviceInfo lastFoundInfo;
     QBluetoothDeviceDiscoveryAgent *discoveryAgent = nullptr;
     QLowEnergyController *controller = nullptr;
     QLowEnergyService *configService = nullptr;
