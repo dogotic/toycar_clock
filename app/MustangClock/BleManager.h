@@ -31,6 +31,7 @@ signals:
     void dataSent();   // optional, for JSON write feedback
 
 private:
+    void cleanupController();
     void writeToBle(const QByteArray &json);
     QBluetoothDeviceInfo lastFoundInfo;
     QBluetoothDeviceDiscoveryAgent *discoveryAgent = nullptr;

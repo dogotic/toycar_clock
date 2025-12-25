@@ -122,6 +122,7 @@ class JsonConfigCallback : public BLECharacteristicCallbacks {
 
 /* ================= BLE Setup ================= */
 void setupBLE() {
+  BLEDevice::deinit(true); // force clear bonds
   BLEDevice::init("MUSTANG-CLOCK");
 
   // 🔐 Register security callbacks GLOBALLY (new API)

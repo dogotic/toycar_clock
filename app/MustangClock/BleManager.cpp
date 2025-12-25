@@ -18,36 +18,53 @@ BleManager::BleManager(QObject *parent) : QObject(parent)
                     discoveryAgent->stop();
                     qDebug() << "Device found, storing info...";
                     lastFoundInfo = info;  // store for later connection
-                    emit deviceFound();     // signal QML to enable Connect button
                     connectToDevice();
                 }
             });
 }
 
-void BleManager::connectToDevice()
-{
+void BleManager::cleanupController() {
+    if (!controller) return;
+
+    // Disconnect if still connected
+    if (controller->state() != QLowEnergyController::UnconnectedState) {
+        connect(controller, &QLowEnergyController::disconnected, controller, [=]() {
+            qDebug() << "Old controller fully disconnected, deleting...";
+            controller->deleteLater();
+        });
+        controller->disconnectFromDevice();
+    } else {
+        controller->deleteLater();
+    }
+
+    controller = nullptr;
+    configService = nullptr;
+    configChar = QLowEnergyCharacteristic();  // reset
+}
+
+void BleManager::connectToDevice() {
     if (!lastFoundInfo.isValid()) {
         qWarning() << "No device info available to connect";
         return;
     }
 
-    // Clean up old controller
-    if (controller) {
-        controller->disconnectFromDevice();
-        controller->deleteLater();
-        controller = nullptr;
-    }
+    // Clean up any old controller
+    cleanupController();
 
+    // Create fresh controller
     controller = QLowEnergyController::createCentral(lastFoundInfo, this);
     if (!controller) {
         qWarning() << "Failed to create QLowEnergyController";
         return;
     }
 
-    // Request pairing through this instance
-    localDevice->requestPairing(lastFoundInfo.address(), QBluetoothLocalDevice::Paired);
+    // Pair only if not already paired
+    if (localDevice->pairingStatus(lastFoundInfo.address()) != QBluetoothLocalDevice::Paired) {
+        qDebug() << "Requesting pairing...";
+        localDevice->requestPairing(lastFoundInfo.address(), QBluetoothLocalDevice::Paired);
+    }
 
-    // Connect controller signals
+    // Signals
     connect(controller, &QLowEnergyController::connected, this, [=]() {
         qDebug() << "Connected, discovering services...";
         emit connected();
@@ -63,7 +80,7 @@ void BleManager::connectToDevice()
         if (uuid == SERVICE_UUID) qDebug() << "Config service found";
     });
 
-    connect(controller, &QLowEnergyController::discoveryFinished, this, [=](){
+    connect(controller, &QLowEnergyController::discoveryFinished, this, [=]() {
         configService = controller->createServiceObject(SERVICE_UUID, this);
         if (!configService) {
             qDebug() << "Service creation failed";
@@ -80,10 +97,24 @@ void BleManager::connectToDevice()
         configService->discoverDetails();
     });
 
+    connect(controller, &QLowEnergyController::errorOccurred, this, [=](QLowEnergyController::Error error){
+        qDebug() << "BLE controller error:" << error;
+    });
+
+    connect(controller, &QLowEnergyController::connectionUpdated, this, [=](const QLowEnergyConnectionParameters &params){
+        qDebug() << "BLE connection updated:"
+                 << "Latency:" << params.latency()
+                 << "Supervision Timeout:" << params.supervisionTimeout();
+    });
+
     // Initiate connection
+    qDebug() << "Starting connection to device...";
     controller->connectToDevice();
 }
 
+BleManager::~BleManager() {
+    cleanupController();
+}
 
 void BleManager::startScan()
 {
@@ -117,6 +148,3 @@ void BleManager::writeToBle(const QByteArray &json)
     // emit dataSent("WiFi");   // or "Time"/"Alarm"
 }
 
-BleManager::~BleManager() {
-    controller->disconnectFromDevice();
-}
