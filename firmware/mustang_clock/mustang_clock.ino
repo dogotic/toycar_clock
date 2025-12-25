@@ -144,7 +144,7 @@ void setupBLE() {
     );
 
   cfg->setCallbacks(new JsonConfigCallback());
-  cfg->addDescriptor(new BLE2902());
+  //cfg->addDescriptor(new BLE2902());
 
   service->start();
 
