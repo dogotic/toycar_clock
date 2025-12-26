@@ -186,14 +186,11 @@ bool writeByte(uint8_t b)
 }
 
 
-void showDots(uint8_t dots, uint8_t *digits)
+void showDots(uint8_t dots, uint8_t* digits)
 {
-    for (int i = 0; i < 4; ++i)
-    {
-        digits[i] |= (dots & 0x80);
-        dots <<= 1;
-    }
+    digits[1] |= (dots & 0x80); // dvotočka između 2. i 3. digit
 }
+
 
 uint8_t encodeDigit(uint8_t digit)
 {
