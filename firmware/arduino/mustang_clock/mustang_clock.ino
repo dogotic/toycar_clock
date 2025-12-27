@@ -15,8 +15,8 @@
 TM1637Display display(CLK, DIO);
 
 /* ================= BLE UUIDs ================= */
-#define SERVICE_UUID  "6fce0001-8c94-4c2f-8d1f-8d5cfd000001"
-#define CHAR_CFG_UUID "6fce0002-8c94-4c2f-8d1f-8d5cfd000002"
+#define SERVICE_UUID  "12345678-9abc-def0-f0de-bc9a78563412"
+#define CHAR_CFG_UUID "9abcdef0-1234-5678-7856-3412f0debc9a"
 
 /* ================= Globals ================= */
 Preferences prefs;
