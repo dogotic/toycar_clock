@@ -89,7 +89,7 @@ void BleManager::connectToDevice() {
 
         connect(configService, &QLowEnergyService::stateChanged, this, [=](QLowEnergyService::ServiceState s){
             if (s == QLowEnergyService::RemoteServiceDiscovered) {
-                configChar = configService->characteristic(CHAR_UUID);
+                configChar = configService->characteristic(WIFI_CONFIG_CHAR_UUID);
                 qDebug() << "Characteristic ready";
             }
         });

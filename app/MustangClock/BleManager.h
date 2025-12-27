@@ -41,10 +41,10 @@ private:
     QBluetoothLocalDevice *localDevice = nullptr;
 
     const QBluetoothUuid SERVICE_UUID =
-        QBluetoothUuid(QStringLiteral("6fce0001-8c94-4c2f-8d1f-8d5cfd000001"));
+        QBluetoothUuid(QStringLiteral("12345678-9abc-def0-f0de-bc9a78563412"));
 
-    const QBluetoothUuid CHAR_UUID =
-        QBluetoothUuid(QStringLiteral("6fce0002-8c94-4c2f-8d1f-8d5cfd000002"));
+    const QBluetoothUuid WIFI_CONFIG_CHAR_UUID =
+        QBluetoothUuid(QStringLiteral("9abcdef0-1234-5678-7856-3412-f0debc9a"));
 
 };
 
