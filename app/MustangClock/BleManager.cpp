@@ -89,8 +89,11 @@ void BleManager::connectToDevice() {
 
         connect(configService, &QLowEnergyService::stateChanged, this, [=](QLowEnergyService::ServiceState s){
             if (s == QLowEnergyService::RemoteServiceDiscovered) {
-                configChar = configService->characteristic(WIFI_CONFIG_CHAR_UUID);
+                configChar = configService->characteristic(CONFIG_CHAR_UUID);
                 qDebug() << "Characteristic ready";
+                for (auto c : configService->characteristics()) {
+                    qDebug() << "  UUID:" << c.uuid();
+                }
             }
         });
 
@@ -132,8 +135,13 @@ void BleManager::sendConfig(const QVariantMap &cfg)
 
 void BleManager::writeToBle(const QByteArray &json)
 {
-    if (!configService || !configChar.isValid()) {
-        qDebug() << "BLE not ready";
+    if (!configService) {
+        qDebug() << "BLE not ready service not available";
+        return;
+    }
+    if (!configChar.isValid()) {
+        qDebug() << "BLE not ready characteristic invalid";
+        qDebug() << "  UUID:" << configChar.uuid();
         return;
     }
 

@@ -7,13 +7,7 @@
 #include "gatt_svc.h"
 #include "common.h"
 
-static int set_wifi_chr_access(uint16_t conn_handle, uint16_t attr_handle,
-    struct ble_gatt_access_ctxt *ctxt, void *arg);
-
-static int set_time_chr_access(uint16_t conn_handle, uint16_t attr_handle,
-    struct ble_gatt_access_ctxt *ctxt, void *arg);
-
-static int set_alarm_chr_access(uint16_t conn_handle, uint16_t attr_handle,
+static int config_chr_access(uint16_t conn_handle, uint16_t attr_handle,
     struct ble_gatt_access_ctxt *ctxt, void *arg);
 
 /* Automation IO service */
@@ -30,25 +24,11 @@ static uint16_t set_alarm_chr_val_handle;
 */
 
 /* set wifi uid */
-static const ble_uuid128_t set_wifi_chr_uuid =
+static const ble_uuid128_t config_chr_uuid =
     BLE_UUID128_INIT(0x9a,0xbc,0xde,0xf0,
                      0x12,0x34,0x56,0x78,
                      0x78,0x56,0x34,0x12,
                      0xf0,0xde,0xbc,0x9a);
-
-/* set wifi uid */
-static const ble_uuid128_t set_time_chr_uuid =
-    BLE_UUID128_INIT(0x9b,0xbc,0xde,0xf0,
-                     0x12,0x34,0x56,0x78,
-                     0x78,0x56,0x34,0x12,
-                     0xf0,0xde,0xbc,0x9b);
-
-/* set wifi uid */
-static const ble_uuid128_t set_alarm_chr_uuid =
-    BLE_UUID128_INIT(0x9c,0xbc,0xde,0xf0,
-                     0x12,0x34,0x56,0x78,
-                     0x78,0x56,0x34,0x12,
-                     0xf0,0xde,0xbc,0x9c);
 
 static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
     {
@@ -57,27 +37,11 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
         .characteristics = (struct ble_gatt_chr_def[]) {
             /* STRING WRITE characteristic */
             {
-                .uuid = &set_wifi_chr_uuid.u,
-                .access_cb = set_wifi_chr_access,
+                .uuid = &config_chr_uuid.u,
+                .access_cb = config_chr_access,
                 .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
                 /* val_handle OPTIONAL */
             },
-
-            /* STRING WRITE characteristic */
-            {
-                .uuid = &set_time_chr_uuid.u,
-                .access_cb = set_time_chr_access,
-                .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
-                /* val_handle OPTIONAL */
-            },
-
-            /* STRING WRITE characteristic */
-            {
-                .uuid = &set_alarm_chr_uuid.u,
-                .access_cb = set_alarm_chr_access,
-                .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
-                /* val_handle OPTIONAL */
-            },            
 
             {0}  /* <-- KRAJ CHARACTERISTICS */
         },
@@ -87,51 +51,7 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
 };
 
 static int
-set_wifi_chr_access(uint16_t conn_handle, uint16_t attr_handle,
-                  struct ble_gatt_access_ctxt *ctxt, void *arg)
-{
-    if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) {
-        return BLE_ATT_ERR_UNLIKELY;
-    }
-
-    char buf[128] = {0};
-    int len = OS_MBUF_PKTLEN(ctxt->om);
-
-    if (len >= sizeof(buf)) {
-        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
-    }
-
-    ble_hs_mbuf_to_flat(ctxt->om, buf, sizeof(buf) - 1, NULL);
-
-    ESP_LOGI(TAG, "STRING RX (%d bytes): %s", len, buf);
-
-    return 0;
-}
-
-static int
-set_time_chr_access(uint16_t conn_handle, uint16_t attr_handle,
-                  struct ble_gatt_access_ctxt *ctxt, void *arg)
-{
-    if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) {
-        return BLE_ATT_ERR_UNLIKELY;
-    }
-
-    char buf[128] = {0};
-    int len = OS_MBUF_PKTLEN(ctxt->om);
-
-    if (len >= sizeof(buf)) {
-        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
-    }
-
-    ble_hs_mbuf_to_flat(ctxt->om, buf, sizeof(buf) - 1, NULL);
-
-    ESP_LOGI(TAG, "STRING RX (%d bytes): %s", len, buf);
-
-    return 0;
-}
-
-static int
-set_alarm_chr_access(uint16_t conn_handle, uint16_t attr_handle,
+config_chr_access(uint16_t conn_handle, uint16_t attr_handle,
                   struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) {

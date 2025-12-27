@@ -43,8 +43,8 @@ private:
     const QBluetoothUuid SERVICE_UUID =
         QBluetoothUuid(QStringLiteral("12345678-9abc-def0-f0de-bc9a78563412"));
 
-    const QBluetoothUuid WIFI_CONFIG_CHAR_UUID =
-        QBluetoothUuid(QStringLiteral("9abcdef0-1234-5678-7856-3412-f0debc9a"));
+    const QBluetoothUuid CONFIG_CHAR_UUID =
+        QBluetoothUuid(QStringLiteral("9abcdef0-1234-5678-7856-3412f0debc9a"));
 
 };
 
