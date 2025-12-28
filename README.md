@@ -4,4 +4,4 @@ Toy car turned into an alarm clock
 
 TO DO: 
 
-[ ] add ds3231 RTC for keeping time
+- [ ] add ds3231 RTC for keeping time
