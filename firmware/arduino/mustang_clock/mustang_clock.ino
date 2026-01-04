@@ -7,12 +7,22 @@
 #include <BLE2902.h>
 #include <Preferences.h>
 #include <ArduinoJson.h>
+#include <Wire.h>
+#include <RTClib.h>
 #include "time.h"
 
 /* ================= TM1637 ================= */
-#define CLK 13
-#define DIO 12
+#define CLK 9
+#define DIO 8
+
+#define I2C_SDA 11
+#define I2C_SCL 12
+
 TM1637Display display(CLK, DIO);
+
+/* ================= RTC ================= */
+RTC_DS3231 rtc;
+bool rtc_ok = false;
 
 /* ================= BLE UUIDs ================= */
 #define SERVICE_UUID  "12345678-9abc-def0-f0de-bc9a78563412"
@@ -28,37 +38,51 @@ int alarm_h = 6;
 int alarm_m = 30;
 bool alarm_enabled = false;
 
-bool manual_time_valid = false;
-time_t manual_time_base;
-unsigned long manual_time_ms;
-
 /* ================= Forward decl ================= */
 void connectWiFi();
 
+/* ================= RTC helpers ================= */
+void setRTCfromTM(const struct tm &t) {
+  if (!rtc_ok) return;
+
+  rtc.adjust(DateTime(
+    t.tm_year + 1900,
+    t.tm_mon + 1,
+    t.tm_mday,
+    t.tm_hour,
+    t.tm_min,
+    t.tm_sec
+  ));
+  Serial.println("RTC updated");
+}
+
+bool getTimeFromRTC(struct tm &t) {
+  if (!rtc_ok) return false;
+
+  DateTime now = rtc.now();
+  t.tm_year = now.year() - 1900;
+  t.tm_mon  = now.month() - 1;
+  t.tm_mday = now.day();
+  t.tm_hour = now.hour();
+  t.tm_min  = now.minute();
+  t.tm_sec  = now.second();
+  return true;
+}
+
 /* ================= BLE Security ================= */
 class MySecurityCallbacks : public BLESecurityCallbacks {
-  uint32_t onPassKeyRequest() override {
-    return 123456;   // PASSKEY
-  }
-
+  uint32_t onPassKeyRequest() override { return 123456; }
   void onPassKeyNotify(uint32_t pass_key) override {
     Serial.printf("BLE passkey: %06lu\n", pass_key);
   }
-
-  bool onConfirmPIN(uint32_t pass_key) override {
-    return true;
-  }
-
-  bool onSecurityRequest() override {
-    return true;
-  }
+  bool onConfirmPIN(uint32_t pass_key) override { return true; }
+  bool onSecurityRequest() override { return true; }
 };
 
 /* ================= BLE JSON handler ================= */
 class JsonConfigCallback : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *c) override {
     String val = c->getValue();
-    Serial.println(val.length());
     if (!val.length()) return;
 
     StaticJsonDocument<512> doc;
@@ -66,7 +90,6 @@ class JsonConfigCallback : public BLECharacteristicCallbacks {
       Serial.println("JSON parse error");
       return;
     }
-    Serial.println(val);
 
     /* ---- WiFi ---- */
     if (doc["wifi"]) {
@@ -81,7 +104,7 @@ class JsonConfigCallback : public BLECharacteristicCallbacks {
       connectWiFi();
     }
 
-    /* ---- Time ---- */
+    /* ---- Time (BLE → RTC) ---- */
     if (doc["time"]) {
       int hh = doc["time"]["hh"] | -1;
       int mm = doc["time"]["mm"] | -1;
@@ -93,10 +116,7 @@ class JsonConfigCallback : public BLECharacteristicCallbacks {
         t.tm_hour = hh;
         t.tm_min  = mm;
         t.tm_sec  = 0;
-
-        manual_time_base = mktime(&t);
-        manual_time_ms = millis();
-        manual_time_valid = true;
+        setRTCfromTM(t);
       }
     }
 
@@ -122,10 +142,9 @@ class JsonConfigCallback : public BLECharacteristicCallbacks {
 
 /* ================= BLE Setup ================= */
 void setupBLE() {
-  BLEDevice::deinit(true); // force clear bonds
+  BLEDevice::deinit(true);
   BLEDevice::init("MUSTANG-CLOCK");
 
-  // 🔐 Register security callbacks GLOBALLY (new API)
   BLEDevice::setSecurityCallbacks(new MySecurityCallbacks());
 
   BLESecurity *security = new BLESecurity();
@@ -145,15 +164,13 @@ void setupBLE() {
     );
 
   cfg->setCallbacks(new JsonConfigCallback());
-  //cfg->addDescriptor(new BLE2902());
-
   service->start();
 
   BLEAdvertising *adv = BLEDevice::getAdvertising();
   adv->addServiceUUID(SERVICE_UUID);
   adv->start();
 
-  Serial.println("BLE ready (secure, passkey)");
+  Serial.println("BLE ready");
 }
 
 /* ================= WiFi + NTP ================= */
@@ -163,20 +180,19 @@ void connectWiFi() {
   WiFi.begin(wifi_ssid.c_str(), wifi_psk.c_str());
   if (WiFi.waitForConnectResult() == WL_CONNECTED) {
     configTime(3600, 3600, "pool.ntp.org");
-    Serial.println("WiFi + NTP OK");
+
+    struct tm t;
+    if (getLocalTime(&t, 10000)) {
+      setRTCfromTM(t);   // NTP → RTC
+      Serial.println("WiFi + NTP OK");
+    }
   }
 }
 
 /* ================= Time source ================= */
 bool getTimeNow(struct tm &t) {
   if (WiFi.isConnected() && getLocalTime(&t)) return true;
-
-  if (manual_time_valid) {
-    time_t now = manual_time_base +
-                 (millis() - manual_time_ms) / 1000;
-    localtime_r(&now, &t);
-    return true;
-  }
+  if (getTimeFromRTC(t)) return true;
   return false;
 }
 
@@ -188,47 +204,37 @@ void checkAlarm(struct tm &t) {
   static int repeatCount = 0;
   static bool blinking = false;
 
-  // Trigger alarm
   if (alarm_enabled &&
       t.tm_hour == alarm_h &&
       t.tm_min == alarm_m &&
       !fired) {
-    Serial.println("ALARM!");
     fired = true;
     blinking = true;
     lastBlink = millis();
     blinkCount = 0;
     repeatCount = 0;
+    Serial.println("ALARM!");
   }
 
-  // Blink routine
   if (blinking) {
-    unsigned long now = millis();
-    if (now - lastBlink >= 150) { // ~quick blink every 150ms
-      lastBlink = now;
+    if (millis() - lastBlink >= 150) {
+      lastBlink = millis();
 
-      // Toggle display on/off
-      if (blinkCount % 2 == 0) {
-        display.clear();
-      } else {
-        int v = t.tm_hour * 100 + t.tm_min;
-        display.showNumberDecEx(v, 0x40, true); // colon on
-      }
+      if (blinkCount % 2 == 0) display.clear();
+      else display.showNumberDecEx(
+        t.tm_hour * 100 + t.tm_min, 0x40, true
+      );
 
       blinkCount++;
-
-      // Three quick blinks per repetition -> 6 toggles
       if (blinkCount >= 6) {
         blinkCount = 0;
         repeatCount++;
-        if (repeatCount >= 8) { // 8 repetitions
-          blinking = false;
-        }
+        if (repeatCount >= 8) blinking = false;
       }
     }
   }
 
-  if (t.tm_min != alarm_m) fired = false; // reset for next day
+  if (t.tm_min != alarm_m) fired = false;
 }
 
 /* ================= Display ================= */
@@ -249,6 +255,14 @@ void setup() {
   alarm_h   = prefs.getInt("alarm_h", 6);
   alarm_m   = prefs.getInt("alarm_m", 30);
   alarm_enabled = prefs.getBool("alarm_en", false);
+
+  Wire.begin(I2C_SDA,I2C_SCL); // ili Wire.begin(SDA, SCL) ako treba
+
+  if (rtc.begin()) {
+    rtc_ok = true;
+    if (rtc.lostPower())
+      Serial.println("RTC lost power");
+  }
 
   connectWiFi();
   setupBLE();
