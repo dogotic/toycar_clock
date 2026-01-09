@@ -18,6 +18,9 @@
 #define I2C_SDA 11
 #define I2C_SCL 12
 
+#define ALARM_LED_1 5
+#define ALARM_LED_2 6
+
 TM1637Display display(CLK, DIO);
 
 /* ================= RTC ================= */
@@ -220,10 +223,18 @@ void checkAlarm(struct tm &t) {
     if (millis() - lastBlink >= 150) {
       lastBlink = millis();
 
-      if (blinkCount % 2 == 0) display.clear();
-      else display.showNumberDecEx(
-        t.tm_hour * 100 + t.tm_min, 0x40, true
-      );
+      if (blinkCount % 2 == 0) {
+        display.clear();
+        digitalWrite(ALARM_LED_1,LOW);
+        digitalWrite(ALARM_LED_2,LOW);        
+      }
+      else {
+        digitalWrite(ALARM_LED_1,HIGH);        
+        digitalWrite(ALARM_LED_2,HIGH);                        
+        display.showNumberDecEx(
+          t.tm_hour * 100 + t.tm_min, 0x40, true
+        );
+      }
 
       blinkCount++;
       if (blinkCount >= 6) {
@@ -246,6 +257,11 @@ void updateDisplay(struct tm &t) {
 
 /* ================= setup / loop ================= */
 void setup() {
+  pinMode(ALARM_LED_1, OUTPUT);
+  pinMode(ALARM_LED_2, OUTPUT);
+  digitalWrite(ALARM_LED_1,HIGH);  
+  digitalWrite(ALARM_LED_2,HIGH);  
+
   Serial.begin(115200);
   display.setBrightness(0x0f);
 
